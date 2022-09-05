@@ -5,8 +5,7 @@ import static qupath.lib.scripting.QP.*
 // Load annotations from file
 def imageDir = new File(project.getImageList()[0].getUris()[0]).getParent()
 def imageName = getCurrentImageData().getServer().getMetadata().getName()
-def imgNameWithOutExt = FilenameUtils.removeExtension(imageName)
-print(imageName)
+def imgNameWithOutExt = imageName.replace(".czi", "")
 // Delete all annotations
 clearAllObjects()
 

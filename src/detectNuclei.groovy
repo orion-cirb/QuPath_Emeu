@@ -48,12 +48,12 @@ def resultsDir = buildFilePath(imageDir, '/Results')
 if (!fileExists(resultsDir)) mkdirs(resultsDir)
 def resultsFile = new File(buildFilePath(resultsDir, 'Results.csv'))
 resultsFile.createNewFile()
-def resHeaders = 'Image name\tAnnotation name\tArea (um2)\tTile ID\tTile area (um2)\tNb DAPI cells\tNb GFP cells\n'
+def resHeaders = 'Image name\tAnnotation name\tArea (um2)\tTile ID\tTile area (um2)\tNb DAPI cells\tNb EGFP cells\n'
 resultsFile.write(resHeaders)
 
 // Define ClassPaths
 def dapiCellsClass = PathClassFactory.getPathClass('DAPI', makeRGB(0,0,255))
-def gfpCellsClass = PathClassFactory.getPathClass('GFP', makeRGB(0,255,0))
+def gfpCellsClass = PathClassFactory.getPathClass('EGFP', makeRGB(0,255,0))
 
 def findNearest(array, value) {
     def min = Double.MAX_VALUE
@@ -65,11 +65,11 @@ def findNearest(array, value) {
 }
 
 // Build StarDist model
-def buildStarDistModel(pathModel, threshold, channel, cellClass) {
+def buildStarDistModel(pathModel, threshold, pixelSize, channel, cellClass) {
     return StarDist2D.builder(pathModel)
             .threshold(threshold)              // Prediction threshold
             .normalizePercentiles(1, 99)       // Percentile normalization
-            .pixelSize(0.5)           // Resolution for detection
+            .pixelSize(pixelSize)           // Resolution for detection
             .channels(channel)
             .constrainToParent(false)
             .measureShape()                  // Add shape measurements
@@ -79,13 +79,13 @@ def buildStarDistModel(pathModel, threshold, channel, cellClass) {
 }
 
 // Detect cells in a specific annotation and channel
-def detectCells(imageData, an, channel, pathModel, probThreshold, cellsClass, pixelWidth, minCellSize, minIntensity) {
+def detectCells(imageData, an, channel, pathModel, probThreshold, cellsClass, pixelWidth, pixelSize, minCellSize, maxCellSize) {
     println '--- Finding ' + channel + ' cells in ROI ' + an.getName() + ' ---'
-    def stardist = buildStarDistModel(pathModel, probThreshold, channel, cellsClass)
+    def stardist = buildStarDistModel(pathModel, probThreshold, pixelSize, channel, cellsClass)
     stardist.detectObjects(imageData, an, true)
     def cells = getDetectionObjects().findAll{it.getPathClass() == cellsClass
             && it.getROI().getScaledArea(pixelWidth, pixelWidth) > minCellSize
-            && it.getMeasurementList().getMeasurementValue(channel +': Median') > minIntensity
+            && it.getROI().getScaledArea(pixelWidth, pixelWidth) < maxCellSize
             && an.getROI().contains(it.getROI().getCentroidX(), it.getROI().getCentroidY())}
     println 'Nb cells detected = ' + cells.size() + ' (' + (getDetectionObjects().findAll{it.getPathClass() == cellsClass}.size() - cells.size()) + ' filtered out)'
     return cells
@@ -109,7 +109,7 @@ for (entry in project.getImageList()) {
     def cal = server.getPixelCalibration()
     def pixelWidth = cal.getPixelWidth().doubleValue()
     def imgName = entry.getImageName()
-    def imgNameWithOutExt = FilenameUtils.removeExtension(imgName)
+    def imgNameWithOutExt = imgName.replace(".czi", "")
     setBatchProjectAndImage(project, imageData)
     println ''
     println ''
@@ -223,9 +223,9 @@ for (entry in project.getImageList()) {
             clearAllObjects()
             addObject(region)
             def dapiCells = detectCells(imageData, region, 'DAPI', pathModel, 0.6, dapiCellsClass,
-                    pixelWidth, 0, 0)
-            def gfpCells = detectCells(imageData, region, 'GFP', pathModel, 0.6, gfpCellsClass,
-                    pixelWidth, 0, 0)
+                    pixelWidth, 0.5, 5, 95)
+            def gfpCells = detectCells(imageData, region, 'EGFP', pathModel, 0.6, gfpCellsClass,
+                    pixelWidth, 1, 5, 95)
             region.clearPathObjects()
             for (tile in tiles) {
                 def dapiChildren = dapiCells.findAll{tile.getROI().contains(it.getROI().getCentroidX(), it.getROI().getCentroidY())}
