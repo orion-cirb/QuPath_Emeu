@@ -30,5 +30,17 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="jar://$USER_HOME$/QuPath/v0.4/extensions/clupath-0.5.1.4-jar-with-dependencies.jar!/" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES>
+          <root url="jar://$USER_HOME$/QuPath/v0.4/extensions/clupath-0.5.1.4-jar-with-dependencies.jar!/script_templates/ImageJ_1.x/Examples" />
+          <root url="jar://$USER_HOME$/QuPath/v0.4/extensions/clupath-0.5.1.4-jar-with-dependencies.jar!/script_templates/ImageJ_1.x/Skeletons" />
+        </SOURCES>
+      </library>
+    </orderEntry>
   </component>
 </module>

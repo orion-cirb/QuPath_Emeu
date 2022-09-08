@@ -10,6 +10,14 @@ import qupath.ext.stardist.StarDist2D
 import qupath.lib.objects.*
 import qupath.lib.gui.dialogs.Dialogs
 import qupath.imagej.gui.ImageJMacroRunner
+import qupath.imagej.gui.IJExtension
+import qupath.imagej.tools.IJTools
+
+import java.time.Instant
+import java.time.Duration
+import qupath.lib.regions.RegionRequest
+import net.haesleinhuepf.clupath.CLUPATH
+
 
 // Init project
 setImageType('Fluorescence')
@@ -42,6 +50,48 @@ run("Send ROI to QuPath");
 close();
 close();
 """
+
+// find skeleton of roi
+def findSkeleton(epidermis, request, downsample) {
+    def clijx = CLUPATH.getInstance()
+    print(clijx.getGPUName())
+    def roiWidth = epidermis.getROI().boundsWidth
+    def roiHeight = epidermis.getROI().boundsHeigth
+    // create image from boundbox roi
+    def imageIn = clijx.create([roiWidth, roiHeight], clijx.Float)
+    def imageBin = clijx.create(imageIn)
+    // apply Otsu thresholding
+    clijx.thresholdOtsu(imageIn, imageBin)
+    def imageSkel = clijx.create(imageIn)
+    // skeletonization
+    clijx.skeletonize(imageBin, imageSkel)
+    // pull back result and turn it into a QuPath ROI
+    imp = clijx.pull(imageSkel)
+    def roi = clijx.pullAsROI(imageSkel)
+    def imagePlane = IJTools.getImagePlane(roi, imp)
+    roi = IJTools.convertToROI(roi, -request.getX() / downsample, -request.getY() / downsample, downsample, imagePlane)
+    // cleanup GPU memory
+    clijx.clear()
+    return (roi)
+}
+
+/*macro = """run("Skeletonize on GPU (experimental)");
+run("CLIJ2 Macro Extensions", "cl_device=[NVIDIA RTX A5000]");
+image = getTitle();
+run("Create Mask");
+image1 = "Mask";
+CLIJ2_push(image1);
+image2 = "skeleton";
+CLIJx_skeletonize(image1, image2);
+CLIJ2_pull(image2);
+selectWindow(image2);
+run("Analyze Particles...", "  show=[Overlay Masks] overlay add");
+roiManager("Add");
+roiManager("Select", 0);
+run("Send ROI to QuPath");
+close();
+close();
+"""*/
 
 // Create results file and write headers
 def resultsDir = buildFilePath(imageDir, '/Results')
@@ -128,6 +178,7 @@ for (entry in project.getImageList()) {
     }
     def dermises = getAnnotationObjects().findAll{it.getName().contains("dermis")}
 
+    def downsample = 2.0
     for (epidermis in epidermises) {
         def dermis = dermises.find{it.getName().replace("dermis", "epidermis") == epidermis.getName()}
 
@@ -138,8 +189,15 @@ for (entry in project.getImageList()) {
         addObject(epidermis)
         addObject(origin)
 
+        // find skeleton
+        def request = epidermis == null ? RegionRequest.createInstance(server, downsample) : RegionRequest.createInstance(server.getPath(), downsample, dermis.getROI())
+        def skeleton = PathObjects.createAnnotationObject(findSkeleton(epidermis, request, downsample))
+
+        /*Instant start = Instant.now()
         ImageJMacroRunner.runMacro(params, imageData, null, epidermis, macro)
-        def skeleton = getAnnotationObjects().find{it.getROI().getRoiName() == "Geometry"}
+        println Duration.between(start, Instant.now()).toMillis()*/
+
+        //def skeleton = getAnnotationObjects().find{it.getROI().getRoiName() == "Geometry"}
         def skeletonSplitted = tools.splitROI(skeleton.getROI())
         println 'Skeleton computed'
 
@@ -257,5 +315,6 @@ for (entry in project.getImageList()) {
     clearAllObjects()
     addObject(origin)
     saveAnnotations(buildFilePath(resultsDir, imgNameWithOutExt+"_origin"))
+    return
 }
 println 'Done!'
