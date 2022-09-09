@@ -7,7 +7,11 @@ import static qupath.lib.gui.scripting.QPEx.*
 import qupath.ext.stardist.StarDist2D
 import qupath.lib.objects.*
 import qupath.lib.gui.dialogs.Dialogs
-import qupath.imagej.gui.ImageJMacroRunner
+import qupath.lib.regions.RegionRequest
+import ij.plugin.Duplicator
+import qupath.imagej.tools.IJTools
+import net.haesleinhuepf.clupath.CLUPATH
+
 
 // Init project
 setImageType('Fluorescence')
@@ -20,29 +24,6 @@ if (pathModel == null) {
 }
 def imageDir = new File(project.getImageList()[0].getUris()[0]).getParent()
 
-// Set ImageJ parameters
-params = new ImageJMacroRunner(getQuPath()).getParameterList()
-params.getParameters().get('downsampleFactor').setValue(1)
-params.getParameters().get('sendROI').setValue(true)
-params.getParameters().get('sendOverlay').setValue(false)
-params.getParameters().get('getOverlay').setValue(false)
-params.getParameters().get('getROI').setValue(true)
-params.getParameters().get('clearObjects').setValue(false)
-// Define ImageJ macro
-macro = """image = getTitle();
-run("Create Mask");
-run("Skeletonize (2D/3D)");
-run("Analyze Particles...", "  show=[Overlay Masks] overlay add");
-selectWindow(image);
-roiManager("Add");
-roiManager("Select", 0);
-run("Send ROI to QuPath");
-close();
-close();
-"""
-//run("Skeletonize"): faster but sometimes leads to small branches that we can't get rid of
-//run("Points from Mask"): allows to retrieve points instead of a polygon in QuPath but points then need to be translated according to the location of the epidermis annotation
-
 // Create results file and write headers
 def resultsDir = buildFilePath(imageDir, '/Results')
 if (!fileExists(resultsDir)) mkdirs(resultsDir)
@@ -54,6 +35,30 @@ resultsFile.write(resHeaders)
 // Define ClassPaths
 def dapiCellsClass = PathClassFactory.getPathClass('DAPI', makeRGB(0,0,255))
 def gfpCellsClass = PathClassFactory.getPathClass('EGFP', makeRGB(0,255,0))
+
+// Compute skeleton of ROI
+def findSkeleton(epidermis, server, request) {
+    def pathImage = IJTools.convertToImagePlus(server, request)
+    // Get first channel
+    def imp = new Duplicator().run(pathImage.getImage(), 1, 1, 1, 1, 1, 1)
+    // Get ROI from QuPath
+    def roi = IJTools.convertToIJRoi(epidermis.getROI(), pathImage)
+    imp.setRoi(roi)
+    // Create mask from ROI
+    def mask = imp.createRoiMask()
+    imp.setProcessor(mask)
+    // Skeletonize with CluPath
+    def clupath = CLUPATH.getInstance()
+    def imageIn = clupath.push(imp)
+    def imageSkel = clupath.create(imageIn)
+    clupath.skeletonize(imageIn, imageSkel)
+    // Pull back result and turn it into a QuPath ROI
+    def roiSkel = clupath.pullAsROI(imageSkel)
+    def roiQuPath = IJTools.convertToROI(roiSkel, -request.getX(), -request.getY(), 1, epidermis.getROI().getImagePlane())
+    // Clean-up GPU memory
+    clupath.clear()
+    return (roiQuPath)
+}
 
 def findNearest(array, value) {
     def min = Double.MAX_VALUE
@@ -138,16 +143,16 @@ for (entry in project.getImageList()) {
         addObject(epidermis)
         addObject(origin)
 
-        ImageJMacroRunner.runMacro(params, imageData, null, epidermis, macro)
-        def skeleton = getAnnotationObjects().find{it.getROI().getRoiName() == "Geometry"}
-        def skeletonSplitted = tools.splitROI(skeleton.getROI())
-        println 'Skeleton computed'
+        def request = RegionRequest.createInstance(server.getPath(), 1, epidermis.getROI())
+        def skeleton = findSkeleton(epidermis, server, request)
+        def skeletonSplitted = tools.splitROI(skeleton)
 
         def skeletonPoints = []
         for (point in skeletonSplitted) {
             skeletonPoints << new Point2(point.getCentroidX(), point.getCentroidY())
         }
         skeletonPoints.sort{it.distance(new Point2(origin.getROI().getCentroidX(), origin.getROI().getCentroidY()))}
+        println 'Skeleton computed'
 
         def cumulativeLengths = []
         def length = 0
@@ -242,7 +247,7 @@ for (entry in project.getImageList()) {
             // Save detections
             deselectAll()
             selectObjects(region)
-            runPlugin('qupath.lib.plugins.objects.DilateAnnotationPlugin', '{"radiusMicrons": 0.01,  "lineCap": "Round",  "removeInterior": false,  "constrainToParent": false}');
+            runPlugin('qupath.lib.plugins.objects.DilateAnnotationPlugin', '{"radiusMicrons": 0.02,  "lineCap": "Round",  "removeInterior": false,  "constrainToParent": false}');
             region = getAnnotationObjects().last()
             region.addPathObjects(tiles)
             fireHierarchyUpdate()
