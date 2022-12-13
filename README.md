@@ -24,5 +24,5 @@
 
 ### Version history
 
-1. Version 1 (*detectNuclei.groovy*) released on September 9, 2022.
-2. Version 2 (*detectNucleiFast.groovy*) released on December 13, 2022.
+Version 1 (*detectNuclei.groovy*) released on September 9, 2022.
+Version 2 (*detectNucleiFast.groovy*) released on December 13, 2022.
