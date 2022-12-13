@@ -7,18 +7,20 @@
 
 ### Images description
 
-2D images of Emeu embryo sections taken with the Axioscan
+2D images of emu embryo sections taken with the Axioscan
 
-*Cy3* channel: isolectine (vessels)
+2 channels: 
+  1. *DAPI:* nuclei
+  2. *EGFP:* cells
 
 ### Plugin description
 
-* Detect vessels and holes in the tissue with a pixel classifier
-* Give their number and area in each annotation provided
+* Divide each epidermis/dermis annotation provided in 10 segments of equal length
+* Detect nuclei and cells in each segment with Stardist
 
 ### Dependencies
 
-* **QuPath pixel classifier** named *vesselsClassifier.json*
+* **Stardist** QuPath extension + *dsb2018_heavy_augment.pb* model
 
 ### Version history
 
