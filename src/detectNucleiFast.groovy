@@ -192,13 +192,16 @@ for (entry in project.getImageList()) {
         def epidermis_tiles = []
         def dermis_tiles = []
         for (def i = 0; i < 10; i++) {
-            def polygonPoints = null
-            if (skeletonNormals[i][1].distance(skeletonNormals[i+1][1]) < skeletonNormals[i][1].distance(skeletonNormals[i+1][0])) {
-                polygonPoints = [skeletonNormals[i][0], skeletonNormals[i][1], skeletonNormals[i+1][1], skeletonNormals[i+1][0]]
+            polygonPoints1 = [skeletonNormals[i][0], skeletonNormals[i][1], skeletonNormals[i+1][1], skeletonNormals[i+1][0]]
+            def polygon1 = ROIs.createPolygonROI(polygonPoints1, epidermis.getROI().getImagePlane())
+            polygonPoints2 = [skeletonNormals[i][0], skeletonNormals[i][1], skeletonNormals[i+1][0], skeletonNormals[i+1][1]]
+            def polygon2 = ROIs.createPolygonROI(polygonPoints2, epidermis.getROI().getImagePlane())
+            def polygon = null
+            if (polygon1.getArea() > polygon2.getArea()) {
+                 polygon = polygon1
             } else {
-                polygonPoints = [skeletonNormals[i][0], skeletonNormals[i][1], skeletonNormals[i+1][0], skeletonNormals[i+1][1]]
+                polygon = polygon2
             }
-            def polygon = ROIs.createPolygonROI(polygonPoints, epidermis.getROI().getImagePlane())
 
             def epidermis_tile = PathObjects.createAnnotationObject(tools.intersection([polygon, epidermis.getROI()]))
             epidermis_tile.setName("tile " + (i+1))
