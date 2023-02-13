@@ -27,7 +27,7 @@ def imageDir = new File(project.getImageList()[0].getUris()[0]).getParent()
 // Create results file and write headers
 def resultsDir = buildFilePath(imageDir, '/Results')
 if (!fileExists(resultsDir)) mkdirs(resultsDir)
-def resultsFile = new File(buildFilePath(resultsDir, 'Results.csv'))
+def resultsFile = new File(buildFilePath(resultsDir, 'Results.xls'))
 resultsFile.createNewFile()
 def resHeaders = 'Image name\tAnnotation name\tArea (um2)\tTile ID\tTile area (um2)\tNb DAPI cells\tNb EGFP cells\n'
 resultsFile.write(resHeaders)
@@ -182,8 +182,8 @@ for (entry in project.getImageList()) {
                 p2 = skeletonPoints[landmark+1]
             }
 
-            def tangent = [p2.getX()-p1.getX(), p2.getY()-p1.getY()]
-            def normal = [1, -tangent[0]/(tangent[1]+Double.MIN_VALUE)]
+            def tangent = [p2.getX()-p1.getX(), p2.getY()-p1.getY()]    
+            def normal = [1, -tangent[0]/(tangent[1]+1E-100)]
             def norm = Math.sqrt(Math.pow(normal[0], 2) + Math.pow(normal[1], 2))
             normal = [1000 * normal[0] / norm, 1000 * normal[1] / norm]
             skeletonNormals << [new Point2(p1.getX()+normal[0], p1.getY()+normal[1]), new Point2(p1.getX()-normal[0], p1.getY()-normal[1])]
@@ -204,7 +204,7 @@ for (entry in project.getImageList()) {
             }
 
             def epidermis_tile = PathObjects.createAnnotationObject(tools.intersection([polygon, epidermis.getROI()]))
-            epidermis_tile.setName("tile " + (i+1))
+            epidermis_tile.setName("tile " +i)
             epidermis_tiles << epidermis_tile
 
             if (dermis != null) {
