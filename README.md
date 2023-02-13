@@ -15,8 +15,12 @@
 
 ### Plugin description
 
+Version 1:
 * Divide each epidermis/dermis annotation provided in 10 segments of equal length
 * Detect nuclei and cells in each segment with Stardist
+
+Version 2:
+* Speed up skeletonization using CluPath instead of ImageJ
 
 ### Dependencies
 
@@ -24,5 +28,6 @@
 
 ### Version history
 
-1. Version 1 (*detectNuclei.groovy*) released on September 9, 2022.
-2. Version 2 (*detectNucleiFast.groovy*) released on October 19, 2022.
+Version 1 (*detectNuclei.groovy*) released on September 9, 2022.
+
+Version 2 (*detectNucleiFast.groovy*) released on December 13, 2022.
